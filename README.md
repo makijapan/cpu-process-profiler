@@ -22,6 +22,8 @@ metrics for CPU usage. Metrics are provided in [nagios_perfdata][5] format.
 **Note:** The macOS binary is built using [cgo][6] and may not be portable
 across all versions of macOS.
 
+Additionally, it will append a list of the 10 processes consuming the most CPU resources.
+
 ## Usage examples
 
 ```
