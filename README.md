@@ -1,6 +1,6 @@
-[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/sensu/check-cpu-usage-with-process-list)
-![Go Test](https://github.com/sensu/check-cpu-usage-with-process-list/workflows/Go%20Test/badge.svg)
-![goreleaser](https://github.com/sensu/check-cpu-usage-with-process-list/workflows/goreleaser/badge.svg)
+[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/MichaelCharles/check-cpu-usage-with-process-list)
+![Go Test](https://github.com/MichaelCharles/check-cpu-usage-with-process-list/workflows/Go%20Test/badge.svg)
+![goreleaser](https://github.com/MichaelCharles/check-cpu-usage-with-process-list/workflows/goreleaser/badge.svg)
 
 # Sensu CPU usage check
 
@@ -80,7 +80,7 @@ spec:
   subscriptions:
     - system
   runtime_assets:
-    - sensu/check-cpu-usage-with-process-list
+    - MichaelCharles/check-cpu-usage-with-process-list
 ```
 
 ## Installation from source
@@ -102,7 +102,7 @@ For more information about contributing to this plugin, see [Contributing][4].
 
 [1]: https://docs.sensu.io/sensu-go/latest/reference/checks/
 [2]: https://docs.sensu.io/sensu-go/latest/reference/assets/
-[3]: https://bonsai.sensu.io/assets/sensu/check-cpu-usage-with-process-list
+[3]: https://bonsai.sensu.io/assets/MichaelCharles/check-cpu-usage-with-process-list
 [4]: https://github.com/sensu/sensu-go/blob/master/CONTRIBUTING.md
 [5]: https://docs.sensu.io/sensu-go/latest/observability-pipeline/observe-schedule/collect-metrics-with-checks/#supported-output-metric-formats
 [6]: https://golang.org/cmd/cgo/
