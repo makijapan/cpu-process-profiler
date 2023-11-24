@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"time"
+	"sort"
 
 	"github.com/sensu-community/sensu-plugin-sdk/sensu"
 	"github.com/sensu/sensu-go/types"
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // Config represents the check plugin config.
@@ -17,12 +19,53 @@ type Config struct {
 	Interval int
 }
 
+// Struct to hold process info
+type ProcessInfo struct {
+    PID  int32
+    CPU  float64
+    Name string
+}
+
+// Function to get top 10 CPU consuming processes
+func getTopCPUProcesses() ([]ProcessInfo, error) {
+    procs, err := process.Processes()
+    if err != nil {
+        return nil, err
+    }
+
+    var processList []ProcessInfo
+    for _, p := range procs {
+        cpuPercent, err := p.CPUPercent()
+        if err != nil {
+            continue
+        }
+        name, err := p.Name()
+        if err != nil {
+            continue
+        }
+
+        processList = append(processList, ProcessInfo{p.Pid, cpuPercent, name})
+    }
+
+    // Sort the processes by CPU usage
+    sort.Slice(processList, func(i, j int) bool {
+        return processList[i].CPU > processList[j].CPU
+    })
+
+    // Keep only top 10
+    if len(processList) > 10 {
+        processList = processList[:10]
+    }
+
+    return processList, nil
+}
+
 var (
 	plugin = Config{
 		PluginConfig: sensu.PluginConfig{
-			Name:     "check-cpu-usage",
+			Name:     "check-cpu-usage-with-process-list",
 			Short:    "Check CPU usage and provide metrics",
-			Keyspace: "sensu.io/plugins/check-cpu-usage/config",
+			Keyspace: "sensu.io/plugins/check-cpu-usage-with-process-list/config",
 		},
 	}
 
@@ -111,15 +154,27 @@ func executeCheck(event *types.Event) (int, error) {
 	guestPct := ((end[0].Guest - start[0].Guest) / diff) * 100
 	guestnicePct := ((end[0].GuestNice - start[0].GuestNice) / diff) * 100
 	perfData := fmt.Sprintf("cpu_idle=%.2f, cpu_system=%.2f, cpu_user=%.2f, cpu_nice=%.2f, cpu_iowait=%.2f, cpu_irq=%.2f, cpu_softirq=%.2f, cpu_steal=%.2f, cpu_guest=%.2f, cpu_guestnice=%.2f", idlePct, sysPct, userPct, nicePct, iowaitPct, irqPct, softirqPct, stealPct, guestPct, guestnicePct)
-	if usedPct > plugin.Critical {
-		fmt.Printf("%s Critical: %.2f%% CPU usage | %s\n", plugin.PluginConfig.Name, usedPct, perfData)
+	
+	// Get top processes irrespective of the CPU state
+    topProcesses, err := getTopCPUProcesses()
+    if err != nil {
+        return sensu.CheckStateCritical, fmt.Errorf("Error obtaining top CPU processes: %v", err)
+    }
 
-		return sensu.CheckStateCritical, nil
-	} else if usedPct > plugin.Warning {
-		fmt.Printf("%s Warning: %.2f%% CPU usage | %s\n", plugin.PluginConfig.Name, usedPct, perfData)
-		return sensu.CheckStateWarning, nil
-	}
+    processInfo := "Top CPU processes:\n"
+    for _, p := range topProcesses {
+        processInfo += fmt.Sprintf("PID %d (%s): %.2f%%\n", p.PID, p.Name, p.CPU)
+    }
 
-	fmt.Printf("%s OK: %.2f%% CPU usage | %s\n", plugin.PluginConfig.Name, usedPct, perfData)
-	return sensu.CheckStateOK, nil
+    if usedPct > plugin.Critical {
+        fmt.Printf("%s Critical: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
+        return sensu.CheckStateCritical, nil
+    } else if usedPct > plugin.Warning {
+        fmt.Printf("%s Warning: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
+        return sensu.CheckStateWarning, nil
+    }
+
+    // Now also includes process list for OK responses
+    fmt.Printf("%s OK: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
+    return sensu.CheckStateOK, nil
 }

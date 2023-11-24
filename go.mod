@@ -1,4 +1,4 @@
-module github.com/nixwiz/check-cpu-usage
+module github.com/MichaelCharles/check-cpu-usage-with-process-list
 
 go 1.14
 
