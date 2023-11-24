@@ -1,4 +1,4 @@
-module github.com/MichaelCharles/check-cpu-usage-with-process-list
+module github.com/makijapan/cpu-process-profiler
 
 go 1.14
 

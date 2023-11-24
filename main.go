@@ -63,9 +63,9 @@ func getTopCPUProcesses() ([]ProcessInfo, error) {
 var (
 	plugin = Config{
 		PluginConfig: sensu.PluginConfig{
-			Name:     "check-cpu-usage-with-process-list",
+			Name:     "cpu-process-profiler",
 			Short:    "Check CPU usage and provide metrics",
-			Keyspace: "sensu.io/plugins/check-cpu-usage-with-process-list/config",
+			Keyspace: "sensu.io/plugins/cpu-process-profiler/config",
 		},
 	}
 
@@ -161,7 +161,7 @@ func executeCheck(event *types.Event) (int, error) {
         return sensu.CheckStateCritical, fmt.Errorf("Error obtaining top CPU processes: %v", err)
     }
 
-    processInfo := "Top CPU processes:\n"
+    processInfo := "\nTop CPU processes:\n"
     for _, p := range topProcesses {
         processInfo += fmt.Sprintf("PID %d (%s): %.2f%%\n", p.PID, p.Name, p.CPU)
     }

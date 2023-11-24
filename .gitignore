@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-check-cpu-usage-with-process-list
+cpu-process-profiler
 
 # Test binary, build with `go test -c`
 *.test

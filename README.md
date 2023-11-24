@@ -1,8 +1,8 @@
-[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/MichaelCharles/check-cpu-usage-with-process-list)
-![Go Test](https://github.com/MichaelCharles/check-cpu-usage-with-process-list/workflows/Go%20Test/badge.svg)
-![goreleaser](https://github.com/MichaelCharles/check-cpu-usage-with-process-list/workflows/goreleaser/badge.svg)
+[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/makijapan/cpu-process-profiler)
+![Go Test](https://github.com/makijapan/cpu-process-profiler/workflows/Go%20Test/badge.svg)
+![goreleaser](https://github.com/makijapan/cpu-process-profiler/workflows/goreleaser/badge.svg)
 
-# Sensu CPU usage check
+# CPU Usage Check with Process Profiler
 
 ## Table of Contents
 
@@ -16,22 +16,16 @@
 
 ## Overview
 
-The Sensu CPU usage check is a [Sensu Check][1] that provides alerting and
-metrics for CPU usage. Metrics are provided in [nagios_perfdata][5] format.
-
-**Note:** The macOS binary is built using [cgo][6] and may not be portable
-across all versions of macOS.
-
-Additionally, it will append a list of the 10 processes consuming the most CPU resources.
+CPU Usage Check with Process Profiler is a [Sensu Check][1] that was built as an extension of the official `check-cpu-usage` check. At the time of this writing, it provides the same functionality as the original `check-cpu-usage` check, with the added benefit of providing a list of the 10 top resource intensive processes at the time that the check was carried out.
 
 ## Usage examples
 
 ```
-Check CPU usage and provide metrics
+Check CPU usage and provide metrics with a list of top resource intensive processes
 
 Usage:
-  check-cpu-usage-with-process-list [flags]
-  check-cpu-usage-with-process-list [command]
+  cpu-process-profiler [flags]
+  cpu-process-profiler [command]
 
 Available Commands:
   help        Help about any command
@@ -41,9 +35,9 @@ Flags:
   -c, --critical float        Critical threshold for overall CPU usage (default 90)
   -w, --warning float         Warning threshold for overall CPU usage (default 75)
   -s, --sample-interval int   Length of sample interval in seconds (default 2)
-  -h, --help                  help for check-cpu-usage-with-process-list
+  -h, --help                  help for cpu-process-profiler
 
-Use "check-cpu-usage-with-process-list [command] --help" for more information about a command.
+Use "cpu-process-profiler [command] --help" for more information about a command.
 ```
 
 ## Configuration
@@ -55,7 +49,7 @@ using an asset, please consider doing so! If you're using sensuctl 5.13 with
 Sensu Backend 5.13 or later, you can use the following command to add the asset:
 
 ```
-sensuctl asset add MichaelCharles/check-cpu-usage-with-process-list
+sensuctl asset add makijapan/cpu-process-profiler
 ```
 
 If you're using an earlier version of sensuctl, you can find the asset on the
@@ -68,11 +62,11 @@ If you're using an earlier version of sensuctl, you can find the asset on the
 type: CheckConfig
 api_version: core/v2
 metadata:
-  name: check-cpu-usage-with-process-list
+  name: cpu-process-profiler
   namespace: default
 spec:
   command: >-
-    check-cpu-usage-with-process-list
+    cpu-process-profiler
     --critical 95
     --warning 85
     --sample-interval 2
@@ -82,7 +76,7 @@ spec:
   subscriptions:
     - system
   runtime_assets:
-    - MichaelCharles/check-cpu-usage-with-process-list
+    - makijapan/cpu-process-profiler
 ```
 
 ## Installation from source
@@ -92,7 +86,7 @@ Asset. If you would like to compile and install the plugin from source or
 contribute to it, download the latest version or create an executable from this
 source.
 
-From the local path of the check-cpu-usage-with-process-list repository:
+From the local path of the cpu-process-profiler repository:
 
 ```
 go build
@@ -104,7 +98,7 @@ For more information about contributing to this plugin, see [Contributing][4].
 
 [1]: https://docs.sensu.io/sensu-go/latest/reference/checks/
 [2]: https://docs.sensu.io/sensu-go/latest/reference/assets/
-[3]: https://bonsai.sensu.io/assets/MichaelCharles/check-cpu-usage-with-process-list
+[3]: https://bonsai.sensu.io/assets/makijapan/cpu-process-profiler
 [4]: https://github.com/sensu/sensu-go/blob/master/CONTRIBUTING.md
 [5]: https://docs.sensu.io/sensu-go/latest/observability-pipeline/observe-schedule/collect-metrics-with-checks/#supported-output-metric-formats
 [6]: https://golang.org/cmd/cgo/
