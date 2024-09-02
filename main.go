@@ -2,16 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os/exec"
-	"runtime"
-	"sort"
-	"strconv"
-	"strings"
 	"time"
+	"sort"
 
 	"github.com/sensu-community/sensu-plugin-sdk/sensu"
 	"github.com/sensu/sensu-go/types"
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // Config represents the check plugin config.
@@ -22,11 +19,45 @@ type Config struct {
 	Interval int
 }
 
-// ProcessInfo holds information about a single process
+// Struct to hold process info
 type ProcessInfo struct {
-	PID  int
-	CPU  float64
-	Name string
+    PID  int32
+    CPU  float64
+    Name string
+}
+
+// Function to get top 10 CPU consuming processes
+func getTopCPUProcesses() ([]ProcessInfo, error) {
+    procs, err := process.Processes()
+    if err != nil {
+        return nil, err
+    }
+
+    var processList []ProcessInfo
+    for _, p := range procs {
+        cpuPercent, err := p.CPUPercent()
+        if err != nil {
+            continue
+        }
+        name, err := p.Name()
+        if err != nil {
+            continue
+        }
+
+        processList = append(processList, ProcessInfo{p.Pid, cpuPercent, name})
+    }
+
+    // Sort the processes by CPU usage
+    sort.Slice(processList, func(i, j int) bool {
+        return processList[i].CPU > processList[j].CPU
+    })
+
+    // Keep only top 10
+    if len(processList) > 10 {
+        processList = processList[:10]
+    }
+
+    return processList, nil
 }
 
 var (
@@ -90,21 +121,21 @@ func checkArgs(event *types.Event) (int, error) {
 func executeCheck(event *types.Event) (int, error) {
 	start, err := cpu.Times(false)
 	if err != nil {
-		return sensu.CheckStateCritical, fmt.Errorf("error obtaining CPU timings: %v", err)
+		return sensu.CheckStateCritical, fmt.Errorf("Error obtaining CPU timings: %v", err)
 	}
 
 	startTotal := start[0].User + start[0].System + start[0].Idle + start[0].Nice + start[0].Iowait + start[0].Irq + start[0].Softirq + start[0].Steal + start[0].Guest + start[0].GuestNice
 
 	duration, err := time.ParseDuration(fmt.Sprintf("%ds", plugin.Interval))
 	if err != nil {
-		return sensu.CheckStateCritical, fmt.Errorf("error parsing duration: %v", err)
+		return sensu.CheckStateCritical, fmt.Errorf("Error parsing duration: %v", err)
 	}
 
 	time.Sleep(duration)
 
 	end, err := cpu.Times(false)
 	if err != nil {
-		return sensu.CheckStateCritical, fmt.Errorf("error obtaining CPU timings: %v", err)
+		return sensu.CheckStateCritical, fmt.Errorf("Error obtaining CPU timings: %v", err)
 	}
 
 	endTotal := end[0].User + end[0].System + end[0].Idle + end[0].Nice + end[0].Iowait + end[0].Irq + end[0].Softirq + end[0].Steal + end[0].Guest + end[0].GuestNice
@@ -123,107 +154,27 @@ func executeCheck(event *types.Event) (int, error) {
 	guestPct := ((end[0].Guest - start[0].Guest) / diff) * 100
 	guestnicePct := ((end[0].GuestNice - start[0].GuestNice) / diff) * 100
 	perfData := fmt.Sprintf("cpu_idle=%.2f, cpu_system=%.2f, cpu_user=%.2f, cpu_nice=%.2f, cpu_iowait=%.2f, cpu_irq=%.2f, cpu_softirq=%.2f, cpu_steal=%.2f, cpu_guest=%.2f, cpu_guestnice=%.2f", idlePct, sysPct, userPct, nicePct, iowaitPct, irqPct, softirqPct, stealPct, guestPct, guestnicePct)
+	
+	// Get top processes irrespective of the CPU state
+    topProcesses, err := getTopCPUProcesses()
+    if err != nil {
+        return sensu.CheckStateCritical, fmt.Errorf("Error obtaining top CPU processes: %v", err)
+    }
 
-	topProcesses, err := getTopCPUProcesses()
-	if err != nil {
-		return sensu.CheckStateCritical, fmt.Errorf("error obtaining top CPU processes: %v", err)
-	}
+    processInfo := "\nTop CPU processes:\n"
+    for _, p := range topProcesses {
+        processInfo += fmt.Sprintf("PID %d (%s): %.2f%%\n", p.PID, p.Name, p.CPU)
+    }
 
-	processInfo := "\nTop CPU processes:\n"
-	for _, p := range topProcesses {
-		processInfo += fmt.Sprintf("PID %d (%s): %.2f%%\n", p.PID, p.Name, p.CPU)
-	}
+    if usedPct > plugin.Critical {
+        fmt.Printf("%s Critical: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
+        return sensu.CheckStateCritical, nil
+    } else if usedPct > plugin.Warning {
+        fmt.Printf("%s Warning: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
+        return sensu.CheckStateWarning, nil
+    }
 
-	if usedPct > plugin.Critical {
-		fmt.Printf("%s Critical: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
-		return sensu.CheckStateCritical, nil
-	} else if usedPct > plugin.Warning {
-		fmt.Printf("%s Warning: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
-		return sensu.CheckStateWarning, nil
-	}
-
-	fmt.Printf("%s OK: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
-	return sensu.CheckStateOK, nil
-}
-
-func getTopCPUProcesses() ([]ProcessInfo, error) {
-	var cmd *exec.Cmd
-	var output []byte
-	var err error
-
-	switch runtime.GOOS {
-	case "darwin", "linux":
-		cmd = exec.Command("ps", "aux", "--sort=-pcpu")
-		output, err = cmd.Output()
-	case "windows":
-		cmd = exec.Command("tasklist", "/v", "/fo", "csv", "/nh", "/sort:cpu")
-		output, err = cmd.Output()
-	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("error executing command: %v", err)
-	}
-
-	return parseProcessOutput(string(output), runtime.GOOS)
-}
-
-func parseProcessOutput(output, os string) ([]ProcessInfo, error) {
-	lines := strings.Split(output, "\n")
-	var processes []ProcessInfo
-
-	switch os {
-	case "darwin", "linux":
-		for _, line := range lines[1:] { // Skip header
-			fields := strings.Fields(line)
-			if len(fields) < 11 {
-				continue
-			}
-			cpu, err := strconv.ParseFloat(fields[2], 64)
-			if err != nil {
-				continue
-			}
-			pid, err := strconv.Atoi(fields[1])
-			if err != nil {
-				continue
-			}
-			processes = append(processes, ProcessInfo{
-				PID:  pid,
-				CPU:  cpu,
-				Name: fields[10],
-			})
-		}
-	case "windows":
-		for _, line := range lines {
-			fields := strings.Split(line, ",")
-			if len(fields) < 8 {
-				continue
-			}
-			cpu := strings.Trim(fields[7], "\"")
-			cpuFloat, err := strconv.ParseFloat(strings.TrimSuffix(cpu, " K"), 64)
-			if err != nil {
-				continue
-			}
-			pid, err := strconv.Atoi(strings.Trim(fields[1], "\""))
-			if err != nil {
-				continue
-			}
-			processes = append(processes, ProcessInfo{
-				PID:  pid,
-				CPU:  cpuFloat,
-				Name: strings.Trim(fields[0], "\""),
-			})
-		}
-	}
-
-	sort.Slice(processes, func(i, j int) bool {
-		return processes[i].CPU > processes[j].CPU
-	})
-
-	if len(processes) > 10 {
-		processes = processes[:10]
-	}
-
-	return processes, nil
+    // Now also includes process list for OK responses
+    fmt.Printf("%s OK: %.2f%% CPU usage | %s\n%s\n", plugin.PluginConfig.Name, usedPct, perfData, processInfo)
+    return sensu.CheckStateOK, nil
 }
